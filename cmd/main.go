@@ -9,9 +9,12 @@ import(
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/aws/aws-lambda-go/events"
+
 	"github.com/dock-tech/lambda-iam-autentication/internal/service"
 	"github.com/dock-tech/lambda-iam-autentication/internal/adapter/restapi"
 	"github.com/dock-tech/lambda-iam-autentication/internal/core"
+	"github.com/dock-tech/lambda-iam-autentication/internal/adapter/handler"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -31,6 +34,8 @@ var (
 	autenticationAdapterRestApi	*restapi.AdapterRestApi
 	restApiData					core.RestApiData
 	autenticationData			core.Autentication
+	response					*events.APIGatewayProxyResponse
+	autenticationHandler		*handler.IamAutenticationHandler
 )
 
 func init(){
@@ -111,10 +116,36 @@ func main() {
 	json.Unmarshal([]byte(*secret_result.SecretString) , &autenticationData)
 	autenticationData.ApiKeyID 		= xApigwApiId
 
-	fmt.Println(autenticationData)
-
 	// Create RESTAPI Adapter
 	autenticationAdapterRestApi = restapi.NewAdapterRestApi(&restApiData)
-	autenticationService = service.NewAutenticationService(autenticationAdapterRestApi, &autenticationData)
+	autenticationService 		= service.NewAutenticationService(autenticationAdapterRestApi, &autenticationData)
+	autenticationHandler 		= handler.NewIamAutenticationHandler(*autenticationService)
 
+	fmt.Println(autenticationHandler)
+}
+
+func lambdaHandler(req events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
+	log.Debug().Msg("lambdaHandler")
+
+	switch req.HTTPMethod {
+		case "GET":
+			 if (req.Resource == "/version"){
+				response, _ = autenticationHandler.GetVersion(version)
+			}else {
+				response, _ = autenticationHandler.UnhandledMethod()
+			}
+		case "POST":
+			if (req.Resource == "/financialmovimentbyperson"){
+				response, _ = autenticationHandler.AutenticationIAM(req)
+			}else {
+				response, _ = autenticationHandler.UnhandledMethod()
+			}
+		case "DELETE":
+			response, _ = autenticationHandler.UnhandledMethod()
+		case "PUT":
+			response, _ = autenticationHandler.UnhandledMethod()
+		default:
+			response, _ = autenticationHandler.UnhandledMethod()
+	}
+	return response, nil
 }

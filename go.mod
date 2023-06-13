@@ -3,6 +3,7 @@ module github.com/dock-tech/lambda-iam-autentication
 go 1.18
 
 require (
+	github.com/aws/aws-lambda-go v1.41.0
 	github.com/aws/aws-sdk-go v1.44.281
 	github.com/aws/aws-sdk-go-v2 v1.18.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.25
