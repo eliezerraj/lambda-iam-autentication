@@ -61,6 +61,8 @@ func makePostAuthIAM(url string, inter interface{}) (interface{}, error) {
 		childLogger.Error().Err(err).Msg("error get Context")
 		return false, erro.ErrBadRequest
 	}
+
+	//credentialsEnv := credentials.NewEnvCredentials()
 	credentials, err := cfg.Credentials.Retrieve(context.TODO())
 	if err != nil {
 		childLogger.Error().Err(err).Msg("error get Credentials")
@@ -78,7 +80,8 @@ func makePostAuthIAM(url string, inter interface{}) (interface{}, error) {
 	}
 
 	req.Header.Add("Content-Type", "application/json;charset=UTF-8");
-	//req.Header.Add("x-api-key", "NvbtUByZfK3PO0trigViL2OSQPlx8KTMa8pszPgt");
+	req.Header.Add("x-api-key", "NvbtUByZfK3PO0trigViL2OSQPlx8KTMa8pszPgt");
+
 	hash := sha256.Sum256([]byte(""))
 	hexHash := fmt.Sprintf("%x", hash)
 

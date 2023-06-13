@@ -8,9 +8,10 @@ type RestApiData struct {
 
 // Type for Autentication
 type Autentication struct {
-	ClientID		string	`json:"client_id,omitempty"`
-	CLientSecret	string	`json:"client_secret,omitempty"`
-	ApiKeyID		string  `json:"api_key_id,omitempty"`
+	ClientID		string	`json:"access_key_id,omitempty"`
+	CLientSecret	string	`json:"secret_access_key_id,omitempty"`
+	ApiKeyID		string  `json:"x_apigw_api_id,omitempty"`
+	AppClientID		string  `json:"x_appClient,omitempty"`
 	Bearer			string  `json:"token,omitempty"`
 }
 
@@ -41,5 +42,10 @@ func WithApiKeyID(apiKeyId string) func(*Autentication) {
 func WithBearer(bearer string) func(*Autentication) {
 	return func(s *Autentication) {
 	  s.Bearer = bearer
+	}
+}
+func WithAppClientID(appClientID string) func(*Autentication) {
+	return func(s *Autentication) {
+	  s.AppClientID = appClientID
 	}
 }

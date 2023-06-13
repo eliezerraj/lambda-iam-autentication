@@ -11,14 +11,17 @@ import (
 var childLogger = log.With().Str("SERVICE", "AutenticationService").Logger()
 
 type AutenticationService struct {
-	adapterRestApi *restapi.AdapterRestApi
+	adapterRestApi 		*restapi.AdapterRestApi
+	autenticationData	*core.Autentication
 }
 
-func NewAutenticationService(adapterRestApi *restapi.AdapterRestApi) *AutenticationService{
+func NewAutenticationService(	adapterRestApi 		*restapi.AdapterRestApi,
+								autenticationData 	*core.Autentication) *AutenticationService{
 	childLogger.Debug().Msg("NewAutenticationService")
 
 	return &AutenticationService{
 		adapterRestApi: adapterRestApi,
+		autenticationData: autenticationData,
 	}
 }
 

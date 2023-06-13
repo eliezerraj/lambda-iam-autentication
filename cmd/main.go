@@ -2,6 +2,9 @@ package main
 
 import(
 	"os"
+	"fmt"
+	"context"
+	"encoding/json"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -9,24 +12,38 @@ import(
 	"github.com/dock-tech/lambda-iam-autentication/internal/service"
 	"github.com/dock-tech/lambda-iam-autentication/internal/adapter/restapi"
 	"github.com/dock-tech/lambda-iam-autentication/internal/core"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+
 )
 
 var (
 	logLevel	=	zerolog.DebugLevel // InfoLevel DebugLevel
-	version		=	"v 0.1"
-	squad		=	"architecture"
+	version		string
+	squad		string
+	awsSecretId string
+	env			string
 
+	xApigwApiId string
 	autenticationService 		*service.AutenticationService
 	autenticationAdapterRestApi	*restapi.AdapterRestApi
 	restApiData					core.RestApiData
+	autenticationData			core.Autentication
 )
 
 func init(){
 	log.Debug().Msg("init")
 	zerolog.SetGlobalLevel(logLevel)
-	// mock
+	// mock data
 	restApiData.Host = "https://kfyn94nf42.execute-api.us-east-2.amazonaws.com"
 	restApiData.Path =  "/live/person"
+	awsSecretId = "secretInternalApp"
+	version = "v 0.1"
+	squad = "ARCH"
+	env = "DEV"
+	xApigwApiId = "qweqwewqew" 
 	//
 	getEnv()
 }
@@ -46,6 +63,12 @@ func getEnv() {
 	if os.Getenv("VERSION") !=  "" {
 		version = os.Getenv("VERSION")
 	}
+	if os.Getenv("SQUAD") !=  "" {
+		squad = os.Getenv("SQUAD")
+	}
+	if os.Getenv("ENV") !=  "" {
+		squad = os.Getenv("ENV")
+	}
 
 	if os.Getenv("HOST_AUTH") !=  "" {
 		restApiData.Host = os.Getenv("HOST_AUTH")
@@ -53,14 +76,45 @@ func getEnv() {
 	if os.Getenv("PATH_AUTH") !=  "" {
 		restApiData.Path = os.Getenv("PATH_AUTH")
 	}
+	if os.Getenv("AWS_SECRET_ID") !=  "" {
+		awsSecretId = os.Getenv("AWS_SECRET_ID")
+	}
+	if os.Getenv("X_APIGW_API_ID") !=  "" {
+		xApigwApiId = os.Getenv("X_APIGW_API_ID")
+	}
 }
 
 func main() {
 	log.Debug().Msg("main lambda-iam-autentication")
 	log.Debug().Str("version", version).Msg("")
 
-	autenticationAdapterRestApi = restapi.NewAdapterRestApi(&restApiData)
-	autenticationService = service.NewAutenticationService(autenticationAdapterRestApi)
+	// Load the IAM Secret
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		log.Error().Err(err).Msg("error LoadDefaultConfig")
+		return
+	}
 
-	///autenticationService.AutenticationIAM(nil)
+	svc := secretsmanager.NewFromConfig(cfg)
+	input := &secretsmanager.GetSecretValueInput{
+		SecretId: aws.String(awsSecretId),
+		VersionStage: aws.String("AWSCURRENT"),
+	}
+	
+	secret_result, err := svc.GetSecretValue(context.TODO() ,input)
+	if err != nil {
+		log.Error().Err(err).Msg("error GetSecretValue")
+		return
+	}
+
+	//Set the Autentication data
+	json.Unmarshal([]byte(*secret_result.SecretString) , &autenticationData)
+	autenticationData.ApiKeyID 		= xApigwApiId
+
+	fmt.Println(autenticationData)
+
+	// Create RESTAPI Adapter
+	autenticationAdapterRestApi = restapi.NewAdapterRestApi(&restApiData)
+	autenticationService = service.NewAutenticationService(autenticationAdapterRestApi, &autenticationData)
+
 }
