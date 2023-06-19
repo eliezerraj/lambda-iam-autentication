@@ -7,17 +7,19 @@ import(
 	"time"
 	"crypto/sha256"
 	"encoding/json"
+	"bytes"
 
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/rs/zerolog/log"
 	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/dock-tech/lambda-iam-autentication/internal/core"
 	"github.com/dock-tech/lambda-iam-autentication/internal/erro"
 )
 
-var childLogger = log.With().Str("RESTAPI", "RestApi").Logger()
+var childLogger = log.With().Str("RESTAPI", "=>").Logger()
 
 type AdapterRestApi struct {
 	restApiAuth *core.RestApiData
@@ -48,77 +50,102 @@ func (r *AdapterRestApi) PostAutentication(autentication *core.Autentication) (*
 		childLogger.Error().Err(err).Msg("error parse interface")
 		return nil, erro.ErrParceInterface
     }
-    
 	return &autentication_result, nil
 }
 
 func makePostAuthIAM(url string, inter interface{}) (interface{}, error) {
 	childLogger.Debug().Msg("makePostAuthIAM")
 	childLogger.Debug().Str("",url).Msg("")
+	childLogger.Debug().Interface("==>",inter).Msg("<==")
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	ctx := context.TODO()
+	autentication_data, ok:= inter.(*core.Autentication)
+	if !ok {
+		return false, erro.ErrBadRequest
+	}
+	// Get Credentials informed via ENV
+	staticProvider := credentials.NewStaticCredentialsProvider(	autentication_data.ClientID, 
+																autentication_data.CLientSecret, 
+																"")
+	// ---------------------------
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithCredentialsProvider(staticProvider))
 	if err != nil {
 		childLogger.Error().Err(err).Msg("error get Context")
-		return false, erro.ErrBadRequest
+		return false, erro.ErrHTTPRequest
 	}
-
-	//credentialsEnv := credentials.NewEnvCredentials()
-	credentials, err := cfg.Credentials.Retrieve(context.TODO())
+	credentials, err := cfg.Credentials.Retrieve(ctx)
 	if err != nil {
 		childLogger.Error().Err(err).Msg("error get Credentials")
-		return false, erro.ErrBadRequest
+		return false, erro.ErrHTTPRequest
 	}
-
-	fmt.Println("***** ",credentials," === ",cfg.Region)
-
+	//fmt.Println("***** ",credentials," === ",cfg.Region)
+	//--------------------------
 	// Set timeout APIGW
 	client := &http.Client{Timeout: time.Second * 29}
-	req, err := http.NewRequest("GET", url, nil)
+		
+	//Prepare the POST payload, transform interface to json
+	requestPayload, err := json.Marshal(inter)
 	if err != nil {
-		childLogger.Error().Err(err).Msg("error NewRequest")
+		childLogger.Error().Err(err).Msg("error json.Marshal(inter)")
 		return false, erro.ErrBadRequest
 	}
 
+	// create a request POST data
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(requestPayload))
+	if err != nil {
+		childLogger.Error().Err(err).Msg("error Request")
+		return false, erro.ErrHTTPRequest
+	}
+	// Setup Headers
 	req.Header.Add("Content-Type", "application/json;charset=UTF-8");
-	req.Header.Add("x-api-key", "NvbtUByZfK3PO0trigViL2OSQPlx8KTMa8pszPgt");
-
-	hash := sha256.Sum256([]byte(""))
+	req.Header.Add("x_apigw_api_id", autentication_data.AppClientID);
+	req.Header.Add("x_appClient", autentication_data.ApiKeyID);
+	// Sign the payload
+	hash := sha256.Sum256([]byte(requestPayload))
 	hexHash := fmt.Sprintf("%x", hash)
-
+	
 	signer := v4.NewSigner()
-	err = signer.SignHTTP(context.TODO(), credentials, req, hexHash, "execute-api", cfg.Region, time.Now())
+	err = signer.SignHTTP(ctx, credentials, req, hexHash, "execute-api", cfg.Region, time.Now())
 	if err != nil {
 		childLogger.Error().Err(err).Msg("error signer with credentials")
-		return false, erro.ErrBadRequest
+		return false, erro.ErrHTTPRequest
 	}
 
+	// Call a POST REST call
 	resp, err := client.Do(req)
 	if err != nil {
-		childLogger.Error().Err(err).Msg("error client.Do")
-		return false, erro.ErrBadRequest
+		childLogger.Error().Err(err).Msg("error Do Request")
+		return false, erro.ErrHTTPRequest
 	}
-
+	
+	childLogger.Debug().Interface("Headers :", resp.Header).Msg("----")
 	childLogger.Debug().Int("StatusCode :", resp.StatusCode).Msg("----")
+
+	//var msg_err map[string]interface{}
+	//json.NewDecoder(resp.Body).Decode(&msg_err)
+	//fmt.Printf("%s\n", msg_err)
+	//----
 	switch (resp.StatusCode) {
-		case 401:
-			return false, erro.ErrHTTPForbiden
-		case 403:
-			return false, erro.ErrHTTPForbiden
-		case 200:
-		case 400:
-			return false, erro.ErrNotFound
-		case 404:
-			return false, erro.ErrNotFound
-		default:
-			return false, erro.ErrHTTPForbiden
-	}
+			case 401:
+				return false, erro.ErrHTTPForbiden
+			case 403:
+				return false, erro.ErrHTTPForbiden
+			case 200:
+			case 400:
+				return false, erro.ErrNotFound
+			case 404:
+				return false, erro.ErrNotFound
+			default:
+				return false, erro.ErrHTTPForbiden
+		}
 
-	result := inter
-	err = json.NewDecoder(resp.Body).Decode(&result)
-    if err != nil {
-		childLogger.Error().Err(err).Msg("error no ErrUnmarshal")
-		return false, erro.ErrUnmarshal
-    }
-
-	return result, nil
+		// Decode result using the Interface
+		result := inter
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		if err != nil {
+			childLogger.Error().Err(err).Msg("error no ErrUnmarshal")
+			return false, erro.ErrUnmarshal
+		}
+	
+		return result, nil
 }

@@ -28,10 +28,10 @@ func NewAutenticationService(	adapterRestApi 		*restapi.AdapterRestApi,
 func (s *AutenticationService) AutenticationIAM(autentication core.Autentication) (*core.Autentication, error){
 	childLogger.Debug().Msg("AutenticationIAM")
 
-	_, err := s.adapterRestApi.PostAutentication(&autentication)
+	res, err := s.adapterRestApi.PostAutentication(&autentication)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	return res, nil
 }

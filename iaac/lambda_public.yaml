@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Lambda Public template
+
+Parameters:
+  Versao:
+    Type: String
+    Default: 1.0
+  Env:
+    Description: Execution environment
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - hml
+      - prd
+
+Conditions:
+  IsPrd: !Equals 
+    - !Ref Env
+    - prd
+
+Mappings:
+  Tag:
+    FunctionLambdaName:
+      Description: Lambda Name
+      Type: String
+      Default: lambda-name
+    PlatformName:
+      Description: Platform Name (TAG)
+      Type: String
+      Default: plataform-name
+    ProductName:
+      Description: Product Name (TAG)
+      Type: String
+      Default: product-name
+    ComponentName:
+      Description: Component Name (TAG)
+      Type: String
+      Default: component-name
+    ScopeName:
+      Description: Scope Type (pci,pci-conneted,non-pci)
+      Type: String
+      Default: non-pci
+      AllowedValues:
+        - pci
+        - pci-connected
+        - non-pci
+    SquadName:
+      Description: Squad Name (TAG)
+      Type: String
+      Default: squad-name
+
+  HandlerName:
+    Description: Handler Name (go=main, python=index.handler)
+    Type: String
+    Default: main
+  Timeout:
+    Type: Number
+    Description: Timeout in seconds
+    Default: 3
+  S3BucketParam:
+    Type: String 
+    Default: account-a-884069944685-artifacts
+  S3KeyParam:
+    Type: String 
+    Default: lambda-card-tenant/main.zip
+
+  ManagedPolicyParameterOne:
+    Description: Inform policy ARN (opcional)
+    Type: String 
+    Default: arn:aws:iam::aws:policy/AmazonRDSFullAccess
+  ManagedPolicyParameterTwo:
+    Description: Inform policy ARN (opcional)
+    Type: String 
+    Default: ""
+  ManagedPolicyParameterThree:
+    Description: Inform policy ARN (opcional)
+    Type: String 
+    Default: ""
+
+  Runtime:
+    Description: Runtime Environment name e.g nodejs, go1.x, python3.9
+    Type: String
+    ConstraintDescription: must be a valid environment (go1.x)
+    Default: go 1.x
+
+Conditions:
+  IsManagedPolicyParameterOne:    !Not [!Equals [ !Ref ManagedPolicyParameterOne, "" ]]
+  IsManagedPolicyParameterTwo:    !Not [!Equals [ !Ref ManagedPolicyParameterTwo, "" ]]
+  IsManagedPolicyParameterThree:  !Not [!Equals [ !Ref ManagedPolicyParameterThree, "" ]]
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - !If [ IsManagedPolicyParameterOne, !Ref ManagedPolicyParameterOne, !Ref 'AWS::NoValue' ]
+        - !If [ IsManagedPolicyParameterTwo, !Ref ManagedPolicyParameterTwo, !Ref 'AWS::NoValue' ]
+        - !If [ IsManagedPolicyParameterThree, !Ref ManagedPolicyParameterThree, !Ref 'AWS::NoValue' ]
+      Policies:
+      - PolicyName: lambda_policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - "s3:*"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - "logs:CreateLogGroup"
+            - "logs:CreateLogStream"
+            - "logs:PutLogEvents"
+            - "logs:PutLogEvents"
+            Resource: "*"
+
+  LambdaFunction: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Ref FunctionLambdaName
+      Handler: !Ref HandlerName
+      Timeout: !Ref Timeout
+      Runtime: !Ref Runtime
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: !Ref Runtime
+      Code: 
+        S3Bucket: !Ref S3BucketParam
+        S3Key: !Ref S3KeyParam
+      Tags:
+      - Key: env
+        Value: !Ref Env
+      - Key: stack
+        Value: !Sub ${AWS::StackName}
+      - Key: name
+        Value: !Ref FunctionLambdaName
+      - Key: platform
+        Value: !Ref PlatformName
+      - Key: product
+        Value: !Ref ProductName
+      - Key: component
+        Value: !Ref ComponentName
+      - Key: scope
+        Value: !Ref ScopeName
+      - Key: squad
+        Value: !Ref SquadName
+
+  LambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: LambdaFunction
+    Properties:
+      RetentionInDays: 7
+      LogGroupName: !Join
+        - ""
+        - -  "/aws/lambda/"
+          - !Ref LambdaFunction
+
+  VersionLambda:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Description: version Live
+
+  AliasLambda:
+    Type: AWS::Lambda::Alias
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      FunctionVersion: !GetAtt VersionLambda.Version
+      Name: LIVE
+
+Outputs:
+  LambdaFunctionARN:
+    Value: !GetAtt 'LambdaFunction.Arn'

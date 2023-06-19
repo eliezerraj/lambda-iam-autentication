@@ -21,7 +21,8 @@ var (
 	version		=	"v 0.1"
 	squad		=	"architecture"
 	AWS_REGION  = 	"us-east-2"
-	xApigwApiId 	string
+	ApiKeyID 	= 	"xpto"
+	AppClientID = 	"103"
 	awsSecretId		string
 
 	autenticationAdapterRestApi	*restapi.AdapterRestApi
@@ -33,8 +34,8 @@ func TestAutenticationAIM(t *testing.T) {
 	t.Setenv("AWS_REGION", AWS_REGION)
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 
-	restApiData.Host = "https://kfyn94nf42.execute-api.us-east-2.amazonaws.com"
-	restApiData.Path =  "/live/person/007"
+	restApiData.Host = "https://vzsxpsgrj6.execute-api.us-east-2.amazonaws.com"
+	restApiData.Path =  "/live"
 	awsSecretId 	= "secretInternalApp"
 
 	// Load the IAM Secret
@@ -55,12 +56,20 @@ func TestAutenticationAIM(t *testing.T) {
 	
 	//Set the Autentication data
 	json.Unmarshal([]byte(*secret_result.SecretString) , &autenticationData)
-	autenticationData.ApiKeyID 		= xApigwApiId
+	
+	autenticationData.UserID 		= "user-01"
+	autenticationData.Password 		= "pass-01"
+	autenticationData.ApiKeyID 		= ApiKeyID
+	autenticationData.AppClientID 	= AppClientID
 
 	// Create RESTAPI Adapter
 	autenticationAdapterRestApi = restapi.NewAdapterRestApi(&restApiData)
 	autenticationService 		:= NewAutenticationService(autenticationAdapterRestApi, &autenticationData)
 	
-	autenticationService.AutenticationIAM(autenticationData)
+	res, err := autenticationService.AutenticationIAM(autenticationData)
+	if err != nil {
+		t.Errorf("Error -TTestAutenticationAIM - AutenticationIAM err: %v ", err)
+	}
 
+	t.Logf("Success !!! %v ", res.Bearer )
 }
