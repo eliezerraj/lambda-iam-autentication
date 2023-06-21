@@ -11,7 +11,7 @@ type Autentication struct {
 	UserID			string	`json:"userid,omitempty"`
 	Password		string	`json:"password,omitempty"`
 	ClientID		string	`json:"access_key_id,omitempty"`
-	CLientSecret	string	`json:"secret_access_key_id,omitempty"`
+	CLientSecret	string	`json:"secret_access_key,omitempty"`
 	ApiKeyID		string  `json:"x_apigw_api_id,omitempty"`
 	AppClientID		string  `json:"x_appClient,omitempty"`
 	Bearer			string  `json:"token,omitempty"`

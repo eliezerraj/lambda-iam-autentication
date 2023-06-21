@@ -4,6 +4,7 @@ import(
 	"github.com/rs/zerolog/log"
 	"net/http"
 	"encoding/json"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-lambda-go/events"
@@ -41,11 +42,21 @@ func (h *IamAutenticationHandler) UnhandledMethod() (*events.APIGatewayProxyResp
 }
 
 func (h *IamAutenticationHandler) AutenticationIAM(req events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
-	childLogger.Debug().Msg("GetFinancialMovimentByPerson")
+	childLogger.Debug().Msg("AutenticationIAM")
 
+	// Extract the body content
     var autentication core.Autentication
     if err := json.Unmarshal([]byte(req.Body), &autentication); err != nil {
         return ApiHandlerResponse(http.StatusBadRequest, ErrorBody{aws.String(err.Error())})
+    }
+	
+    for key, value := range req.Headers {
+        fmt.Printf("    %s: %s\n", key, value)
+		if (key == "x_appClient"){
+			autentication.AppClientID = value
+		} else if (key == "x_apigw_api_id"){
+			autentication.ApiKeyID = value
+		}
     }
 
 	response, err := h.autenticationService.AutenticationIAM(autentication)

@@ -38,18 +38,25 @@ func (r *AdapterRestApi) PostAutentication(autentication *core.Autentication) (*
 
 	url := r.restApiAuth.Host + r.restApiAuth.Path 
 
+	// Make a REST CALL 
 	autentication_interface, err := makePostAuthIAM(url, autentication)
 	if err != nil {
 		childLogger.Error().Err(err).Msg("error makePostAuthIAM")
 		return nil, err
 	}
 
+	//Decode the result
 	var autentication_result core.Autentication
 	err = mapstructure.Decode(autentication_interface, &autentication_result)
     if err != nil {
 		childLogger.Error().Err(err).Msg("error parse interface")
 		return nil, erro.ErrParceInterface
     }
+
+	// Clean the Keys
+	autentication_result.ClientID = ""
+	autentication_result.CLientSecret = ""
+
 	return &autentication_result, nil
 }
 

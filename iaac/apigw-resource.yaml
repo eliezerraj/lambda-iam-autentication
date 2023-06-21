@@ -1,0 +1,216 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ApiGateway Resources Module
+
+Parameters:
+  Versao:
+    Type: String
+    Default: 1
+  ServiceName:
+    Type: String
+  LambdaFunctionArn:
+    Type: String
+  Env:
+    Description: Execution environment
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - hml
+      - prd
+  PlatformName:
+    Description: Platform Name (TAG)
+    Type: String
+    Default: plataform-name
+  ProductName:
+    Description: Product Name (TAG)
+    Type: String
+    Default: product-name
+  ComponentName:
+    Description: Component Name (TAG)
+    Type: String
+    Default: component-name
+  ScopeName:
+    Description: Scope Type (pci,pci-conneted,non-pci)
+    Type: String
+    Default: non-pci
+    AllowedValues:
+      - pci
+      - pci-connected
+      - non-pci
+  SquadName:
+    Description: Squad Name (TAG)
+    Type: String
+    Default: squad-name
+
+Resources:
+  ApiGwLogGroupPrivate:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /apigateway/apigw-iam-authorizer
+      Tags:
+      - Key: env
+        Value: !Ref Env
+      - Key: stack
+        Value: !Sub ${AWS::StackName}         
+      - Key: name
+        Value: !Ref ServiceName
+      - Key: platform
+        Value: !Ref  PlatformName
+      - Key: product
+        Value: !Ref ProductName
+      - Key: component
+        Value: !Ref ComponentName
+      - Key: scope
+        Value: !Ref ScopeName
+      - Key: squad
+        Value: !Ref SquadName
+
+  ApiGatewayPrivate:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Ref ServiceName
+      StageName: Live
+      Variables:
+        apiName: !Ref ServiceName
+      EndpointConfiguration:
+        Type: REGIONAL
+      Tags:
+        env:
+          Ref: Env
+        stack:
+          Fn::Sub: ${AWS::StackName}
+        name:
+          Ref: ServiceName      
+        platform:
+          Ref: PlatformName     
+        product:
+          Ref: ProductName
+        component:
+          Ref: ComponentName
+        scope:
+          Ref: ScopeName
+        squad:
+          Ref: SquadName
+      AccessLogSetting:
+        DestinationArn:
+          Fn::GetAtt:
+          - ApiGwLogGroupPrivate
+          - Arn
+      MethodSettings:
+      - ResourcePath: /*
+        HttpMethod: '*'
+        MetricsEnabled: 'true'
+        DataTraceEnabled: 'false'
+        LoggingLevel: ERROR
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          description: !Ref ServiceName
+          title: !Ref ServiceName
+          version: 1.0.0
+        schemes:
+        - https
+        paths:
+          /autentication:
+            post:
+              consumes:
+              - application/json
+              parameters:
+              - description: !Ref ServiceName
+                schema:
+                  $ref: '#/definitions/Empty'
+              responses:
+                '200':
+                  description: Transaction approved
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                credentials:
+                  Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/APIGatewayIAMAutenticationExecutionRole
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'DELETE,GET,HEAD,PATCH,POST,PUT'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                passthroughBehavior: when_no_match
+                httpMethod: POST
+                type: aws_proxy
+          /version:
+            get:
+              consumes:
+              - application/json
+              parameters:
+              - description: !Ref ServiceName
+                schema:
+                  $ref: '#/definitions/Empty'
+              responses:
+                '200':
+                  description: Transaction approved
+                  schema:
+                    $ref: '#/definitions/Empty'
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                credentials:
+                  Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/APIGatewayIAMAutenticationExecutionRole
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'DELETE,GET,HEAD,PATCH,POST,PUT'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                passthroughBehavior: when_no_match
+                httpMethod: GET
+                type: aws_proxy
+
+  ApiGwDeploymentPrivate:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId:
+        Ref: ApiGatewayPrivate
+
+  ApiGwExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: APIGatewayIAMAutenticationExecutionRole
+      Path: /
+      Policies:
+      - PolicyName: APIGatewayIAMAutenticationExecutionRole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+            - lambda:InvokeFunction
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: '*'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+          Action: sts:AssumeRole

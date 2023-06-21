@@ -2,7 +2,7 @@ package service
 
 import(
 	"testing"
-
+	"fmt"
 	"context"
 	"encoding/json"
 
@@ -28,6 +28,7 @@ var (
 	autenticationAdapterRestApi	*restapi.AdapterRestApi
 	restApiData					core.RestApiData
 	autenticationData			core.Autentication
+	autenticationRequest		core.Autentication
 )
 
 func TestAutenticationAIM(t *testing.T) {
@@ -36,7 +37,7 @@ func TestAutenticationAIM(t *testing.T) {
 
 	restApiData.Host = "https://vzsxpsgrj6.execute-api.us-east-2.amazonaws.com"
 	restApiData.Path =  "/live"
-	awsSecretId 	= "secretInternalApp"
+	awsSecretId 	= "secret-iam-authorizer"
 
 	// Load the IAM Secret
 	cfg, err := config.LoadDefaultConfig(context.TODO())
@@ -57,16 +58,18 @@ func TestAutenticationAIM(t *testing.T) {
 	//Set the Autentication data
 	json.Unmarshal([]byte(*secret_result.SecretString) , &autenticationData)
 	
-	autenticationData.UserID 		= "user-01"
-	autenticationData.Password 		= "pass-01"
-	autenticationData.ApiKeyID 		= ApiKeyID
-	autenticationData.AppClientID 	= AppClientID
+	fmt.Println("====> ",autenticationData)
+
+	autenticationRequest.UserID 	= "user-01"
+	autenticationRequest.Password 	= "pass-01"
+	autenticationRequest.ApiKeyID 	= ApiKeyID
+	autenticationRequest.AppClientID = AppClientID
 
 	// Create RESTAPI Adapter
 	autenticationAdapterRestApi = restapi.NewAdapterRestApi(&restApiData)
 	autenticationService 		:= NewAutenticationService(autenticationAdapterRestApi, &autenticationData)
 	
-	res, err := autenticationService.AutenticationIAM(autenticationData)
+	res, err := autenticationService.AutenticationIAM(autenticationRequest)
 	if err != nil {
 		t.Errorf("Error -TTestAutenticationAIM - AutenticationIAM err: %v ", err)
 	}

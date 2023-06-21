@@ -2,7 +2,6 @@ package main
 
 import(
 	"os"
-	"fmt"
 	"context"
 	"encoding/json"
 
@@ -15,6 +14,8 @@ import(
 	"github.com/dock-tech/lambda-iam-autentication/internal/adapter/restapi"
 	"github.com/dock-tech/lambda-iam-autentication/internal/core"
 	"github.com/dock-tech/lambda-iam-autentication/internal/adapter/handler"
+
+	"github.com/aws/aws-lambda-go/lambda"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -29,7 +30,6 @@ var (
 	awsSecretId string
 	env			string
 
-	xApigwApiId string
 	autenticationService 		*service.AutenticationService
 	autenticationAdapterRestApi	*restapi.AdapterRestApi
 	restApiData					core.RestApiData
@@ -42,13 +42,12 @@ func init(){
 	log.Debug().Msg("init")
 	zerolog.SetGlobalLevel(logLevel)
 	// mock data
-	restApiData.Host = "https://kfyn94nf42.execute-api.us-east-2.amazonaws.com"
-	restApiData.Path =  "/live/person"
-	awsSecretId = "secretInternalApp"
-	version = "v 0.1"
+	restApiData.Host = "https://vzsxpsgrj6.execute-api.us-east-2.amazonaws.com"
+	restApiData.Path =  "/live"
+	awsSecretId = "secret-iam-authorizer"
+	version = "v 0.2"
 	squad = "ARCH"
 	env = "DEV"
-	xApigwApiId = "qweqwewqew" 
 	//
 	getEnv()
 }
@@ -84,9 +83,6 @@ func getEnv() {
 	if os.Getenv("AWS_SECRET_ID") !=  "" {
 		awsSecretId = os.Getenv("AWS_SECRET_ID")
 	}
-	if os.Getenv("X_APIGW_API_ID") !=  "" {
-		xApigwApiId = os.Getenv("X_APIGW_API_ID")
-	}
 }
 
 func main() {
@@ -97,7 +93,7 @@ func main() {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		log.Error().Err(err).Msg("error LoadDefaultConfig")
-		return
+		panic("configuration error LoadDefaultConfig(), " + err.Error())
 	}
 
 	svc := secretsmanager.NewFromConfig(cfg)
@@ -109,23 +105,27 @@ func main() {
 	secret_result, err := svc.GetSecretValue(context.TODO() ,input)
 	if err != nil {
 		log.Error().Err(err).Msg("error GetSecretValue")
-		return
+		panic("configuration error GetSecretValue(), " + err.Error())
 	}
 
 	//Set the Autentication data
 	json.Unmarshal([]byte(*secret_result.SecretString) , &autenticationData)
-	autenticationData.ApiKeyID 		= xApigwApiId
 
 	// Create RESTAPI Adapter
 	autenticationAdapterRestApi = restapi.NewAdapterRestApi(&restApiData)
 	autenticationService 		= service.NewAutenticationService(autenticationAdapterRestApi, &autenticationData)
 	autenticationHandler 		= handler.NewIamAutenticationHandler(*autenticationService)
 
-	fmt.Println(autenticationHandler)
+	lambda.Start(lambdaHandler)
 }
 
 func lambdaHandler(req events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
 	log.Debug().Msg("lambdaHandler")
+	log.Debug().Msg("-------------------")
+	log.Debug().Str("req.Body", req.Body).
+				Msg("APIGateway Request.Body")
+	log.Debug().Msg("--------------------")
+	log.Debug().Interface("req", req).Msg("APIGateway Request")
 
 	switch req.HTTPMethod {
 		case "GET":
@@ -135,7 +135,7 @@ func lambdaHandler(req events.APIGatewayProxyRequest) (*events.APIGatewayProxyRe
 				response, _ = autenticationHandler.UnhandledMethod()
 			}
 		case "POST":
-			if (req.Resource == "/financialmovimentbyperson"){
+			if (req.Resource == "/autentication"){
 				response, _ = autenticationHandler.AutenticationIAM(req)
 			}else {
 				response, _ = autenticationHandler.UnhandledMethod()

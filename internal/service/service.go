@@ -28,6 +28,10 @@ func NewAutenticationService(	adapterRestApi 		*restapi.AdapterRestApi,
 func (s *AutenticationService) AutenticationIAM(autentication core.Autentication) (*core.Autentication, error){
 	childLogger.Debug().Msg("AutenticationIAM")
 
+	// Retrieve the credentials loaded from service and setup inside 
+	autentication.ClientID		=	s.autenticationData.ClientID
+	autentication.CLientSecret	=	s.autenticationData.CLientSecret
+
 	res, err := s.adapterRestApi.PostAutentication(&autentication)
 	if err != nil {
 		return nil, err

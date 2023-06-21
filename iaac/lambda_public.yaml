@@ -13,42 +13,34 @@ Parameters:
       - dev
       - hml
       - prd
-
-Conditions:
-  IsPrd: !Equals 
-    - !Ref Env
-    - prd
-
-Mappings:
-  Tag:
-    FunctionLambdaName:
-      Description: Lambda Name
-      Type: String
-      Default: lambda-name
-    PlatformName:
-      Description: Platform Name (TAG)
-      Type: String
-      Default: plataform-name
-    ProductName:
-      Description: Product Name (TAG)
-      Type: String
-      Default: product-name
-    ComponentName:
-      Description: Component Name (TAG)
-      Type: String
-      Default: component-name
-    ScopeName:
-      Description: Scope Type (pci,pci-conneted,non-pci)
-      Type: String
-      Default: non-pci
-      AllowedValues:
-        - pci
-        - pci-connected
-        - non-pci
-    SquadName:
-      Description: Squad Name (TAG)
-      Type: String
-      Default: squad-name
+  FunctionLambdaName:
+    Description: Lambda Name
+    Type: String
+    Default: lambda-name
+  PlatformName:
+    Description: Platform Name (TAG)
+    Type: String
+    Default: plataform-name
+  ProductName:
+    Description: Product Name (TAG)
+    Type: String
+    Default: product-name
+  ComponentName:
+    Description: Component Name (TAG)
+    Type: String
+    Default: component-name
+  ScopeName:
+    Description: Scope Type (pci,pci-conneted,non-pci)
+    Type: String
+    Default: non-pci
+    AllowedValues:
+      - pci
+      - pci-connected
+      - non-pci
+  SquadName:
+    Description: Squad Name (TAG)
+    Type: String
+    Default: squad-name
 
   HandlerName:
     Description: Handler Name (go=main, python=index.handler)
@@ -60,10 +52,10 @@ Mappings:
     Default: 3
   S3BucketParam:
     Type: String 
-    Default: account-a-884069944685-artifacts
+    Default: account-a-713110364581-artifacts
   S3KeyParam:
     Type: String 
-    Default: lambda-card-tenant/main.zip
+    Default: lambda-iam-autentication/main.zip
 
   ManagedPolicyParameterOne:
     Description: Inform policy ARN (opcional)
@@ -82,12 +74,15 @@ Mappings:
     Description: Runtime Environment name e.g nodejs, go1.x, python3.9
     Type: String
     ConstraintDescription: must be a valid environment (go1.x)
-    Default: go 1.x
+    Default: go1.x
 
 Conditions:
   IsManagedPolicyParameterOne:    !Not [!Equals [ !Ref ManagedPolicyParameterOne, "" ]]
   IsManagedPolicyParameterTwo:    !Not [!Equals [ !Ref ManagedPolicyParameterTwo, "" ]]
   IsManagedPolicyParameterThree:  !Not [!Equals [ !Ref ManagedPolicyParameterThree, "" ]]
+  IsPrd: !Equals 
+    - !Ref Env
+    - prd
 
 Resources:
   LambdaExecutionRole:
@@ -122,6 +117,7 @@ Resources:
             - "logs:CreateLogStream"
             - "logs:PutLogEvents"
             - "logs:PutLogEvents"
+            - "secretsmanager:GetSecretValue"
             Resource: "*"
 
   LambdaFunction: 
